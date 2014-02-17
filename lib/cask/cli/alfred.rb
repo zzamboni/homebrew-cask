@@ -48,7 +48,7 @@ class Cask::CLI::Alfred
       opoo "Alfred is already linked to homebrew-cask."
     else
       odebug 'Linking Alfred scopes'
-      save_alfred_scopes(alfred_scopes << Cask.caskroom)
+      write_alfred_preference(KEY, 'array', (alfred_scopes << Cask.caskroom))
       ohai "Successfully linked Alfred to homebrew-cask."
     end
   end
@@ -60,7 +60,7 @@ class Cask::CLI::Alfred
       opoo "Alfred is already unlinked from homebrew-cask."
     else
       odebug 'Unlinking Alfred scopes'
-      save_alfred_scopes(alfred_scopes.reject { |x| x == Cask.caskroom.to_s })
+      write_alfred_preference(KEY, 'array', alfred_scopes.reject { |x| x == Cask.caskroom.to_s })
       ohai "Successfully unlinked Alfred from homebrew-cask."
     end
   end
@@ -76,11 +76,11 @@ class Cask::CLI::Alfred
   end
 
   def self.save_alfred_scopes(scopes)
-    alfred_preference(KEY, "(#{scopes.map { |s| "'#{s}'" }.join(",")})")
+    read_alfred_preference(KEY, "(#{scopes.map { |s| "'#{s}'" }.join(",")})")
   end
 
   def self.alfred_installed?
-    alfred_preference('version') =~ /^2\.[0-9]/
+    read_alfred_preference('version') =~ /^2\.[0-9]/
   end
 
   def self.linked?
@@ -97,7 +97,7 @@ class Cask::CLI::Alfred
   SCOPE_REGEXP = /^\s*"(.*)",?$/
 
   def self.alfred_scopes
-    scopes = alfred_preference(KEY).split("\n").map do |line|
+    scopes = read_alfred_preference(KEY).split("\n").map do |line|
       matchdata = line.match(SCOPE_REGEXP)
       matchdata ? matchdata.captures.first : nil
     end.compact
@@ -105,14 +105,14 @@ class Cask::CLI::Alfred
     scopes.empty? ? DEFAULT_SCOPES : scopes
   end
 
-  def self.alfred_preference(key, value=nil)
-    if value
-      odebug 'Writing Alfred preferences'
-      @system_command.run('/usr/bin/defaults', :args => ['write', DOMAIN, key, %Q("#{value}")])
-    else
-      odebug 'Reading Alfred preferences'
-      @system_command.run('/usr/bin/defaults', :args => ['read', DOMAIN, key])
-    end
+  def self.read_alfred_preference(key)
+    odebug "Reading Alfred preference: #{key}"
+    @system_command.run('/usr/bin/defaults', :args => ['read', DOMAIN, key])
+  end
+
+  def self.write_alfred_preference(key, type, values)
+    odebug 'Writing Alfred preference: #{key}[#{type}] => #{values.inspect}'
+    @system_command.run('/usr/bin/defaults', :args => ['write', DOMAIN, key, "-#{type}", *values])
   end
 
   def self.usage
